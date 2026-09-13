@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0B57D0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B57D0" media="(prefers-color-scheme: dark)" />
+    <meta name="description" content="SMSForwarder 短信中心：短信、通知与来电验证码的集中管理面板。" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>SMSForwarder 短信中心</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // 首屏前先应用配色模式，避免浅/深色闪烁（与 ThemeModeProvider 的 storage key 一致）
+      (function () {
+        try {
+          var stored = localStorage.getItem('smsf.theme-mode');
+          var mode = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+          var resolved =
+            mode === 'system'
+              ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+              : mode;
+          document.documentElement.setAttribute('data-mui-color-scheme', resolved);
+        } catch (error) {
+          /* localStorage 不可用时交给 React 处理 */
+        }
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

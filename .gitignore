@@ -1,0 +1,34 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# --- Node ---
+node_modules/
+dist/
+*.local
+.vite/
+
+# --- App data / secrets ---
+data/
+*.sqlite
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+.env
+.env.*
+!.env.example
+
+# --- 构建产物（前端由 pnpm build 生成，Docker 镜像内重新构建）---
+backend/app/static/
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+.DS_Store
+result
+result-*

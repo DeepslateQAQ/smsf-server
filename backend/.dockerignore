@@ -1,0 +1,25 @@
+# Python 虚拟环境与缓存
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# 运行期数据（由 compose 的 ./data:/app/data 挂载提供）
+data/
+*.sqlite
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# 前端构建产物由镜像内单独拷贝，不要把宿主机的残留带进来
+app/static/
+
+# 本地环境变量与编辑器
+.env
+.env.*
+.idea/
+.vscode/
+.DS_Store

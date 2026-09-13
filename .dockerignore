@@ -1,0 +1,38 @@
+# 构建上下文 = 仓库根（Dockerfile 在根）。这份 .dockerignore 才真正生效；
+# backend/.dockerignore 供单独以 backend/ 为上下文构建时使用。
+.git
+.gitignore
+
+# Python 虚拟环境与缓存
+**/.venv
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+
+# Node 依赖与构建产物（dist 由镜像内 pnpm build 重新生成）
+**/node_modules
+frontend/dist
+
+# 后端静态目录由镜像内拷贝，忽略宿主机残留
+backend/app/static
+
+# 运行期数据
+backend/data
+data
+*.sqlite
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# 本地环境变量、编辑器、Nix 结果链接
+.env
+.env.*
+!.env.example
+.idea
+.vscode
+.DS_Store
+result
+result-*
