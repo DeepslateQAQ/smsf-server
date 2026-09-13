@@ -17,7 +17,8 @@ SMSForwarder 服务端（`smsf-server`）接收手机端 [SmsForwarder](https://
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 docker compose logs -f smsf
 ```
 

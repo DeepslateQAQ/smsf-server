@@ -8,10 +8,10 @@
 services:
   smsf:
     container_name: smsf-server
+    image: ghcr.io/deepslateqaq/smsf-server:latest
     build:
       context: .
       dockerfile: Dockerfile
-    image: smsf-server:latest
     restart: unless-stopped
     # 可选：若仓库根存在 .env 就加载（不存在也不报错）。
     # environment 的优先级高于 env_file，因此下面的 SMSF_DATABASE_URL 始终以
