@@ -5,15 +5,15 @@
 admin 路由里的元数据操作（用户、设备、设置、审计），绝不进入内容查询路径。
 """
 
-from __future__ import annotations
-
 import datetime as dt
+import ipaddress
 from collections.abc import Sequence
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DbSession
 
+from .cloudflare import is_cloudflare_peer
 from .config import get_settings
 from .db import get_db
 from .models import Device, DeviceShare, User
@@ -23,13 +23,32 @@ from .security import hash_session_token
 SESSION_COOKIE = get_settings().session_cookie_name
 
 
+def _valid_ip(value: str) -> str | None:
+    try:
+        return str(ipaddress.ip_address(value.strip()))
+    except ValueError:
+        return None
+
+
 def client_ip(request: Request) -> str:
+    """按显式配置解析客户端 IP；代理头未被信任时一律忽略。"""
     settings = get_settings()
-    if settings.trusted_proxy:
+    peer = (request.client.host if request.client else "").strip()
+
+    if settings.client_ip_source == "cf-connecting-ip":
+        if is_cloudflare_peer(peer):
+            cloudflare_ip = _valid_ip(request.headers.get("cf-connecting-ip", ""))
+            if cloudflare_ip:
+                return cloudflare_ip[:64]
+        return peer[:64]
+
+    if settings.client_ip_source == "x-forwarded-for":
         forwarded = request.headers.get("x-forwarded-for", "")
         if forwarded:
-            return forwarded.split(",")[0].strip()[:64]
-    return (request.client.host if request.client else "")[:64]
+            forwarded_ip = _valid_ip(forwarded.rsplit(",", 1)[-1])
+            if forwarded_ip:
+                return forwarded_ip[:64]
+    return peer[:64]
 
 
 def user_agent(request: Request) -> str:

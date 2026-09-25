@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -48,7 +49,7 @@ class Settings(BaseSettings):
     auto_migrate: bool = True
     log_level: str = "INFO"
     root_path: str = ""
-    trusted_proxy: bool = False
+    client_ip_source: Literal["off", "x-forwarded-for", "cf-connecting-ip"] = "off"
     static_dir: Path = APP_DIR / "static"
 
     # 入库防护

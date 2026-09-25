@@ -6,15 +6,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from .cloudflare import refresh_cloudflare_ranges, refresh_loop
 from .config import get_settings
 from .logging_config import configure_logging
 from .migrations import run_migrations
@@ -35,19 +37,25 @@ def _assert_single_worker() -> None:
             f"检测到 WEB_CONCURRENCY={workers}，请改为 1。"
         )
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _assert_single_worker()
     settings = get_settings()
-    if getattr(settings, "auto_migrate", True):
-        try:
-            run_migrations()
-        except Exception:  # pragma: no cover - 迁移失败必须显式暴露
-            logger.exception("自动迁移失败，请手动执行 alembic upgrade head")
-            raise
-    logger.info("smsf-server 启动完成，db=%s", settings.database_url)
-    yield
+    await refresh_cloudflare_ranges()
+    refresh_task = asyncio.create_task(refresh_loop())
+    try:
+        if getattr(settings, "auto_migrate", True):
+            try:
+                run_migrations()
+            except Exception:  # pragma: no cover - 迁移失败必须显式暴露
+                logger.exception("自动迁移失败，请手动执行 alembic upgrade head")
+                raise
+        logger.info("smsf-server 启动完成，db=%s", settings.database_url)
+        yield
+    finally:
+        refresh_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await refresh_task
 
 
 def create_app() -> FastAPI:

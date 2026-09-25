@@ -11,12 +11,22 @@ from app.main import create_app
 from app.security import compute_signature
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session as DbSession
+from starlette.requests import Request
 
 from .conftest import DEFAULT_PASSWORD, login, make_device, make_user
 
 INGEST = "/api/v1/ingest"
 STALE_HOURS = 72
 
+
+def _request_with_headers(headers: dict[str, str], host: str = "192.0.2.10") -> Request:
+    return Request(
+        {
+            "type": "http",
+            "headers": [(key.lower().encode(), value.encode()) for key, value in headers.items()],
+            "client": (host, 12345),
+        }
+    )
 
 def _signed_payload(secret: str, *, timestamp_ms: int, device_mark: str | None = None) -> dict:
     payload = {
@@ -28,6 +38,30 @@ def _signed_payload(secret: str, *, timestamp_ms: int, device_mark: str | None =
     if device_mark:
         payload["device_mark"] = device_mark
     return payload
+
+
+def test_client_ip_source_modes(monkeypatch) -> None:
+    from app.deps import client_ip
+
+    settings = get_settings()
+    request = _request_with_headers(
+        {"X-Forwarded-For": "198.51.100.7", "CF-Connecting-IP": "203.0.113.8"}
+    )
+    monkeypatch.setattr(settings, "client_ip_source", "off")
+    assert client_ip(request) == "192.0.2.10"
+
+    chained = _request_with_headers({"X-Forwarded-For": "198.51.100.7, 192.0.2.10"})
+    monkeypatch.setattr(settings, "client_ip_source", "x-forwarded-for")
+    assert client_ip(chained) == "192.0.2.10"
+
+    monkeypatch.setattr(settings, "client_ip_source", "cf-connecting-ip")
+    assert client_ip(request) == "192.0.2.10"
+
+    cloudflare_request = _request_with_headers(
+        {"X-Forwarded-For": "198.51.100.7", "CF-Connecting-IP": "203.0.113.8"},
+        host="173.245.48.1",
+    )
+    assert client_ip(cloudflare_request) == "203.0.113.8"
 
 
 # ------------------------------------------------------------------ 1. 计时侧信道

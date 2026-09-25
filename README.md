@@ -109,13 +109,14 @@ Base64(HMAC-SHA256(secret, "{timestamp}\\n{secret}"))
 | `SMSF_PORT` | `8801` | 服务端口 |
 | `SMSF_COOKIE_SECURE` | `false` | HTTPS 部署时设为 `true` |
 | `SMSF_ROOT_PATH` | 空 | 反向代理前缀，例如 `/smsf` |
-| `SMSF_TRUSTED_PROXY` | `false` | 是否信任 `X-Forwarded-For` |
+| `SMSF_CLIENT_IP_SOURCE` | `off` | 客户端 IP 来源：`off`、`x-forwarded-for` 或 `cf-connecting-ip`。XFF 仅适合可信单层代理并取最右段；CF 模式要求 TCP 对端属于 Cloudflare 网段。
 | `SMSF_LOGIN_MAX_FAILURES` | `5` | 单用户名失败次数 |
 | `SMSF_LOGIN_LOCK_MINUTES` | `15` | 单用户名锁定时间 |
 | `SMSF_LOGIN_IP_MAX_FAILURES` | `20` | 单 IP 失败次数 |
 | `SMSF_LOGIN_IP_LOCK_MINUTES` | `15` | 单 IP 限速窗口 |
 | `SMSF_SIGN_MAX_SKEW_HOURS` | `24` | 签名时间允许偏差 |
 
+Cloudflare 网段在服务启动时抓取并每 24 小时刷新一次；抓取失败时回退到内置网段列表。`cf-connecting-ip` 模式仅在 TCP 对端确实是 Cloudflare 边缘 IP 时生效；如果前面还有本机 Nginx 或 Cloudflare Tunnel，请使用 `x-forwarded-for` 模式。
 通过 HTTPS 公开服务时，建议同时启用 `SMSF_COOKIE_SECURE=true`，并在 Cloudflare Access 或其他反向代理层增加访问控制。
 
 ## 备份
