@@ -2,6 +2,9 @@
 
 SMSForwarder 服务端（`smsf-server`）接收手机端 [SmsForwarder](https://github.com/pppscn/SmsForwarder) 推送的短信、通知和来电，并提供网页端检索、验证码提取、设备共享与用户管理。
 
+> [!WARNING]
+> 本项目属于「岩酱的奇思妙想」系列，代码主要由人工智能生成并维护。请在使用前充分评估其安全性、可靠性与适用性，并谨慎用于生产环境。
+
 ## 特性
 
 - FastAPI + SQLite，单文件数据库，便于备份
