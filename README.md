@@ -8,7 +8,7 @@ SMSForwarder 服务端（`smsf-server`）接收手机端 [SmsForwarder](https://
 - React + MUI 前端，由后端托管生产构建产物
 - Argon2id 密码哈希、不透明会话 Cookie
 - 设备支持 HMAC-SHA256 签名和 Bearer secret
-- 管理员只能管理元数据，不能绕过设备可见范围读取短信正文
+- 消息正文访问范围严格受设备可见性限制，管理员不能绕过权限读取消息正文
 - 实时消息通过 SSE 推送
 
 ## 使用方式
@@ -58,11 +58,10 @@ Vite 会把 `/api` 请求代理到 `http://127.0.0.1:8801`。
 
 1. 登录网页端，进入「设备」并创建设备。
 2. 保存创建响应中只显示一次的 `secret` 和 `device_mark`。
-3. 在 SmsForwarder 中创建 Webhook：
-   - URL：`http(s)://主机地址:8801/api/v1/ingest`
-   - 方法：`POST`
-   - Header：`Content-Type: application/json`
-4. 请求体使用：
+3. 在 SmsForwarder 的「发送通道」中新建「Webhook」：
+   - Webhook Server：`http(s)://主机地址:8801/api/v1/ingest`
+   - 请求方式：`POST`
+4. 在「消息模板」中填入：
 
 ```json
 {
@@ -72,12 +71,21 @@ Vite 会把 `/api` 请求代理到 `http://127.0.0.1:8801`。
   "receive_time": "[receive_time:yyyy-MM-dd'T'HH:mm:ssXXX]",
   "timestamp": "[timestamp]",
   "sign": "[sign]",
-  "device_mark": "[device_mark]",
+  "device_mark": "<本设备的 device_mark>",
   "card_slot": "[card_slot]"
 }
 ```
 
-在 SmsForwarder 的「密钥」中填设备 `secret`，在「设备备注」中填 `device_mark`。服务端签名规则为：
+5. 将设备 `secret` 填入「Secret」。网页端的接入向导会把本设备的 `device_mark` 直接写入消息模板，无需修改 App 的全局设置。
+6. 在「Headers」中添加：键 `Content-Type`，值 `application/json`。
+7. 在「通用设置」中完成短信转发与保活配置：
+   - 打开「转发短信广播」，按提示授予读取短信、通知类短信、发送短信等权限，并关闭验证码保护。
+   - 在「保活措施」中开启「开机启动」「忽略电池优化设置」「在最近任务列表中隐藏」，不要禁用通知栏；可选开启 Cactus 增强保活措施。
+8. 在「转发规则」页面点击「添加转发规则」：
+   - 选择「发送通道」，配置「匹配字段」「匹配模式」「匹配的值」，并启用规则。
+   - 选择你创建的 Webhook 通道；通道名称可填「短信中心」。
+
+服务端签名规则为：
 
 ```text
 Base64(HMAC-SHA256(secret, "{timestamp}\\n{secret}"))
@@ -85,7 +93,7 @@ Base64(HMAC-SHA256(secret, "{timestamp}\\n{secret}"))
 
 低版本 Android 不支持 `XXX` 时，将 `receive_time` 改为 `yyyy-MM-dd'T'HH:mm:ssZ`。
 
-设备页的「接入向导」最后一步会自动等待测试推送，并在收到消息后显示连接结果。
+设备页的「接入向导」进入测试步骤后会自动等待测试推送，并在收到首条推送后在窗口内显示连接结果。测试期间收到的推送只用于本次验证，不写入消息库；测试结束后恢复正常入库。
 
 ## 配置
 

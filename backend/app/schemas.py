@@ -46,6 +46,24 @@ class IngestResponse(BaseModel):
     received_at: dt.datetime
     time_source: str
 
+class TestPushOut(BaseModel):
+    sender: str
+    code: str | None
+    received_at: dt.datetime
+    time_source: str
+    sign_ok: bool
+    auth_kind: str
+
+
+class TestSessionOut(BaseModel):
+    session_id: str
+    expires_at: dt.datetime
+
+
+class TestSessionStatus(BaseModel):
+    active: bool
+    push: TestPushOut | None = None
+
 
 # --------------------------------------------------------------------- auth
 
@@ -146,15 +164,6 @@ class ShareCreate(BaseModel):
     username: str = Field(min_length=1, max_length=64)
 
 
-class IngestCandidate(BaseModel):
-    """接入向导用：一次真实推送的解析回显。"""
-
-    message_id: int
-    sender: str
-    code: str | None
-    received_at: dt.datetime
-    time_source: str
-    sign_ok: bool
 
 
 # --------------------------------------------------------------------- messages

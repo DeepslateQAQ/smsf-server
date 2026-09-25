@@ -68,10 +68,8 @@ class EventHub:
                 subscriber.queue.put_nowait(event)
             except Exception:
                 pass
-
     @property
     def subscriber_count(self) -> int:
         return sum(len(bucket) for bucket in self._subscribers.values())
-
 
 hub = EventHub()

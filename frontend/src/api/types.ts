@@ -96,6 +96,25 @@ export interface DeviceOut {
   /** 仅创建/轮换响应返回，用于接入向导 */
   secret?: string | null;
 }
+export interface TestPushOut {
+  sender: string;
+  code: string | null;
+  received_at: string;
+  time_source: string;
+  sign_ok: boolean;
+  auth_kind: string;
+}
+
+export interface TestSessionOut {
+  session_id: string;
+  expires_at: string;
+}
+
+export interface TestSessionStatus {
+  active: boolean;
+  push: TestPushOut | null;
+}
+
 
 export interface DeviceCreate {
   name: string;
@@ -116,15 +135,6 @@ export interface ShareCreate {
   username: string;
 }
 
-/** 接入向导：一次真实推送的解析回显 */
-export interface IngestCandidate {
-  message_id: number;
-  sender: string;
-  code: string | null;
-  received_at: string;
-  time_source: string;
-  sign_ok: boolean;
-}
 
 // --------------------------------------------------------------------- messages
 

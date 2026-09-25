@@ -273,7 +273,7 @@ export default function DevicesPage() {
     if (!pendingRotate) return;
     rotateDevice.mutate(pendingRotate.id, {
       onSuccess: (device) => {
-        setWizard({ open: true, device, secret: device.secret ?? null, step: 3 });
+        setWizard({ open: true, device, secret: device.secret ?? null, step: 2 });
         setToast(copy.rotate.success);
       },
       onSettled: () => setPendingRotate(null),

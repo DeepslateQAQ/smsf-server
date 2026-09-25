@@ -22,7 +22,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import CopyButton from '@/components/CopyButton';
 import { useT } from '@/i18n';
@@ -33,14 +33,14 @@ import type { DeviceOut } from '@/api/types';
 import { useRotateDeviceSecret } from './queries';
 import { useDeviceCopy } from './useDeviceCopy';
 import { useSelfCheck } from './useSelfCheck';
-import { buildIngestBodyTemplate, buildWizardConfig, INGEST_FIELDS } from './wizard';
+import { buildIngestBodyTemplate, buildWizardConfig, INGEST_FIELDS, type HeaderPair } from './wizard';
 
 export interface DeviceWizardDialogProps {
   open: boolean;
   device: DeviceOut;
   /** 创建/轮换响应里拿到的 secret；已有设备打开时为空 */
   initialSecret?: string | null;
-  /** 打开时停留的步骤（0-3），默认第 1 步 */
+  /** 打开时停留的步骤（0-4），默认第 1 步 */
   initialStep?: number;
   /** 只有拥有者能重新生成密钥 */
   canManage?: boolean;
@@ -80,6 +80,29 @@ function CodeBlock({ value, label }: { value: string; label?: string }) {
   );
 }
 
+function HeaderPairBlock({
+  header,
+  keyLabel,
+  valueLabel,
+}: {
+  header: HeaderPair;
+  keyLabel: string;
+  valueLabel: string;
+}) {
+  return (
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="stretch">
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <CodeBlock value={header.key} label={keyLabel} />
+      </Box>
+      <Typography sx={{ alignSelf: 'center' }} aria-hidden="true">
+        :
+      </Typography>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <CodeBlock value={header.value} label={valueLabel} />
+      </Box>
+    </Stack>
+  );
+}
 function authKindLabel(kind: string, copy: ReturnType<typeof useDeviceCopy>): string {
   if (kind === 'bearer') return copy.selfCheck.authBearer;
   if (kind === 'sign') return copy.selfCheck.authSign;
@@ -89,134 +112,167 @@ function authKindLabel(kind: string, copy: ReturnType<typeof useDeviceCopy>): st
 function SelfCheckPanel({ deviceId, onSkip, autoStart = false }: { deviceId: number; onSkip: () => void; autoStart?: boolean }) {
   const copy = useDeviceCopy();
   const { state, start, reset } = useSelfCheck(deviceId);
+  const autoStartedRef = useRef(false);
 
-  // 进入本步（或显式重试）自动开始自检；离开/卸载时由 useSelfCheck 自己的清理收尾
+  // 进入本步只自动开始一次；点击“停止”后不因 idle 状态再次触发。
   useEffect(() => {
-    if (autoStart && state.phase === 'idle') start();
-  }, [autoStart, state.phase, start]);
+    if (!autoStart) {
+      autoStartedRef.current = false;
+      return;
+    }
+    if (!autoStartedRef.current) {
+      autoStartedRef.current = true;
+      start();
+    }
+  }, [autoStart, start]);
 
   return (
     <Stack spacing={1.5}>
-        <Typography variant="titleMedium" component="h3">
-          {copy.selfCheck.title}
-        </Typography>
+      <Typography variant="titleMedium" component="h3">
+        {copy.selfCheck.title}
+      </Typography>
 
-        {state.phase === 'idle' ? (
-          <>
-            <Typography variant="bodySmall" color="text.secondary">
-              {copy.selfCheck.intro}
-            </Typography>
-            <Typography variant="bodySmall" color="text.secondary">
-              {copy.selfCheck.prepare}
-            </Typography>
-            {!autoStart ? (
-              <Box>
-                <Button variant="outlined" onClick={start}>
-                  {copy.selfCheck.start}
-                </Button>
-              </Box>
-            ) : null}
-          </>
-        ) : null}
+      {state.phase === 'idle' ? (
+        <>
+          <Typography variant="bodySmall" color="text.secondary">
+            {copy.selfCheck.intro}
+          </Typography>
+          <Typography variant="bodySmall" color="text.secondary">
+            {copy.selfCheck.prepare}
+          </Typography>
+          {!autoStart ? (
+            <Box>
+              <Button variant="outlined" onClick={start}>
+                {copy.selfCheck.start}
+              </Button>
+            </Box>
+          ) : null}
+        </>
+      ) : null}
 
-        {state.phase === 'waiting' ? (
+      {state.phase === 'waiting' ? (
+        <Stack spacing={1.5}>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <CircularProgress size={20} color="primary" />
-            <Typography variant="bodySmall" color="text.secondary">
+            <Typography variant="bodySmall" color="text.secondary" sx={{ flex: 1 }}>
               {autoStart ? copy.selfCheck.autoWaiting : copy.selfCheck.waiting}
             </Typography>
             <Button size="small" color="inherit" onClick={reset}>
               {copy.selfCheck.stop}
             </Button>
           </Stack>
-        ) : null}
-
-        {state.phase === 'success' ? (
-          /* 祝贺态：secondaryContainer 的居中卡，回显首条推送要点 */
-          <Box
-            sx={{
-              borderRadius: md3Geometry.shape.xl,
-              bgcolor: 'var(--mui-palette-secondaryContainer)',
-              color: 'var(--mui-palette-onSecondaryContainer)',
-              p: 3,
-              textAlign: 'center',
-            }}
-          >
-            <Stack spacing={1.5} alignItems="center">
-              <CelebrationOutlinedIcon sx={{ fontSize: 40 }} />
-              <Typography variant="titleLarge" component="h4">
-                {copy.selfCheck.congratsTitle}
-              </Typography>
-              <Typography variant="bodySmall" sx={{ opacity: 0.85 }}>
-                {copy.selfCheck.congratsBody}
-              </Typography>
-              <Divider sx={{ width: '100%', borderColor: 'color-mix(in srgb, currentColor 24%, transparent)' }} />
-              <Stack spacing={0.5} alignItems="center">
-                <Typography variant="bodySmall">
-                  {copy.selfCheck.sender}: {state.message?.sender || '—'}
-                </Typography>
-                <Typography variant="bodySmall">
-                  {copy.selfCheck.code}: {state.message?.code ?? copy.selfCheck.noCode}
-                </Typography>
-                <Typography variant="bodySmall">
-                  {copy.selfCheck.receivedAt}:{' '}
-                  {state.message ? formatDateTime(state.message.received_at) : '—'}
-                </Typography>
-                <Typography variant="bodySmall">
-                  {copy.selfCheck.authKind}: {authKindLabel(state.device.last_auth_kind, copy)}
-                </Typography>
-              </Stack>
-            </Stack>
-          </Box>
-        ) : null}
-
-        {state.phase === 'timeout' ? (
-          <Alert severity="warning">
-            <Typography variant="titleSmall" sx={{ mb: 1 }}>
-              {copy.selfCheck.timeout}
+          <Alert severity="info">
+            <Typography variant="titleSmall" sx={{ mb: 0.5 }}>
+              {copy.selfCheck.guideTitle}
             </Typography>
-            <Typography variant="bodySmall" sx={{ mb: 0.5 }}>
-              {copy.selfCheck.checklistTitle}
-            </Typography>
-            <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+            <Box component="ol" sx={{ m: 0, pl: 2.5 }}>
               <li>
-                <Typography variant="bodySmall">{copy.selfCheck.checklist.address}</Typography>
+                <Typography variant="bodySmall">{copy.selfCheck.guideSteps.configureSms}</Typography>
               </li>
               <li>
-                <Typography variant="bodySmall">{copy.selfCheck.checklist.headers}</Typography>
+                <Typography variant="bodySmall">{copy.selfCheck.guideSteps.configureKeepAlive}</Typography>
               </li>
               <li>
-                <Typography variant="bodySmall">{copy.selfCheck.checklist.body}</Typography>
+                <Typography variant="bodySmall">{copy.selfCheck.guideSteps.configureRule}</Typography>
               </li>
               <li>
-                <Typography variant="bodySmall">{copy.selfCheck.checklist.deviceMark}</Typography>
+                <Typography variant="bodySmall">{copy.selfCheck.guideSteps.send}</Typography>
               </li>
               <li>
-                <Typography variant="bodySmall">{copy.selfCheck.checklist.network}</Typography>
+                <Typography variant="bodySmall">{copy.selfCheck.guideSteps.wait}</Typography>
               </li>
-            </Box>
-            <Box sx={{ mt: 1.5 }}>
-              <Button size="small" variant="outlined" onClick={start}>
-                {copy.selfCheck.retry}
-              </Button>
+              <li>
+                <Typography variant="bodySmall">{copy.selfCheck.guideSteps.result}</Typography>
+              </li>
             </Box>
           </Alert>
-        ) : null}
+        </Stack>
+      ) : null}
 
-        {state.phase === 'success' ? (
-          <Box>
-            <Button size="small" variant="text" onClick={start}>
+      {state.phase === 'success' ? (
+        <Box
+          sx={{
+            borderRadius: md3Geometry.shape.xl,
+            bgcolor: 'var(--mui-palette-secondaryContainer)',
+            color: 'var(--mui-palette-onSecondaryContainer)',
+            p: 3,
+            textAlign: 'center',
+          }}
+        >
+          <Stack spacing={1.5} alignItems="center">
+            <CelebrationOutlinedIcon sx={{ fontSize: 40 }} />
+            <Typography variant="titleLarge" component="h4">
+              {copy.selfCheck.congratsTitle}
+            </Typography>
+            <Typography variant="bodySmall" sx={{ opacity: 0.85 }}>
+              {copy.selfCheck.congratsBody}
+            </Typography>
+            <Divider sx={{ width: '100%', borderColor: 'color-mix(in srgb, currentColor 24%, transparent)' }} />
+            <Stack spacing={0.5} alignItems="center">
+              <Typography variant="bodySmall">
+                {copy.selfCheck.sender}: {state.message.sender || '—'}
+              </Typography>
+              <Typography variant="bodySmall">
+                {copy.selfCheck.code}: {state.message.code ?? copy.selfCheck.noCode}
+              </Typography>
+              <Typography variant="bodySmall">
+                {copy.selfCheck.receivedAt}: {formatDateTime(state.message.received_at)}
+              </Typography>
+              <Typography variant="bodySmall">
+                {copy.selfCheck.authKind}: {authKindLabel(state.message.auth_kind, copy)}
+              </Typography>
+            </Stack>
+          </Stack>
+        </Box>
+      ) : null}
+
+      {state.phase === 'timeout' ? (
+        <Alert severity="warning">
+          <Typography variant="titleSmall" sx={{ mb: 1 }}>
+            {copy.selfCheck.timeout}
+          </Typography>
+          <Typography variant="bodySmall" sx={{ mb: 0.5 }}>
+            {copy.selfCheck.checklistTitle}
+          </Typography>
+          <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+            <li>
+              <Typography variant="bodySmall">{copy.selfCheck.checklist.address}</Typography>
+            </li>
+            <li>
+              <Typography variant="bodySmall">{copy.selfCheck.checklist.headers}</Typography>
+            </li>
+            <li>
+              <Typography variant="bodySmall">{copy.selfCheck.checklist.body}</Typography>
+            </li>
+            <li>
+              <Typography variant="bodySmall">{copy.selfCheck.checklist.deviceMark}</Typography>
+            </li>
+            <li>
+              <Typography variant="bodySmall">{copy.selfCheck.checklist.network}</Typography>
+            </li>
+          </Box>
+          <Box sx={{ mt: 1.5 }}>
+            <Button size="small" variant="outlined" onClick={start}>
               {copy.selfCheck.retry}
             </Button>
           </Box>
-        ) : null}
+        </Alert>
+      ) : null}
 
+      {state.phase === 'success' ? (
         <Box>
-          <Button size="small" color="inherit" onClick={onSkip}>
-            {copy.selfCheck.skip}
+          <Button size="small" variant="text" onClick={start}>
+            {copy.selfCheck.retry}
           </Button>
         </Box>
-      </Stack>
+      ) : null}
+
+      <Box>
+        <Button size="small" color="inherit" onClick={onSkip}>
+          {copy.selfCheck.skip}
+        </Button>
+      </Box>
+    </Stack>
   );
 }
 
@@ -245,13 +301,18 @@ export default function DeviceWizardDialog({
   }, [open, initialSecret, initialStep, device.secret]);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const config = buildWizardConfig({ origin, secret });
-  const legacyBody = JSON.stringify(buildIngestBodyTemplate({ legacyReceiveTime: true }), null, 2);
+  const config = buildWizardConfig({ origin, deviceMark: device.device_mark, secret });
+  const bodyTemplate = buildIngestBodyTemplate({ deviceMark: device.device_mark });
+  const legacyBody = JSON.stringify(
+    buildIngestBodyTemplate({ legacyReceiveTime: true, deviceMark: device.device_mark }),
+    null,
+    2,
+  );
   const stepLabels = [
     copy.wizard.steps.address,
-    copy.wizard.steps.headers,
     copy.wizard.steps.body,
     copy.wizard.steps.secret,
+    copy.wizard.steps.headers,
     copy.wizard.steps.check,
   ];
 
@@ -259,14 +320,14 @@ export default function DeviceWizardDialog({
     `【${copy.wizard.addressLabel}】`,
     config.endpoint,
     '',
-    `【${copy.wizard.headersLabel}】`,
-    config.headers,
-    '',
     `【${copy.wizard.bodyLabel}】`,
     config.body,
     '',
     `【${copy.wizard.secretLabel}】`,
     config.secret || copy.wizard.secretMissing,
+    '',
+    `【${copy.wizard.headersLabel}】`,
+    `${config.headers.key}: ${config.headers.value}`,
   ].join('\n');
 
   const handleRegenerate = () => {
@@ -304,42 +365,22 @@ export default function DeviceWizardDialog({
           </Stack>
         ) : null}
 
-        {activeStep === 1 ? (
+        {activeStep === 3 ? (
           <Stack spacing={2}>
             <Typography variant="bodyMedium">{copy.wizard.headersIntro}</Typography>
-            <CodeBlock value={config.headers} label={t('common.copy')} />
+            <HeaderPairBlock
+              header={config.headers}
+              keyLabel={copy.wizard.copyKey}
+              valueLabel={copy.wizard.copyValue}
+            />
           </Stack>
         ) : null}
 
-        {activeStep === 2 ? (
+        {activeStep === 1 ? (
           <Stack spacing={2}>
             <Typography variant="bodyMedium">{copy.wizard.bodyIntro}</Typography>
             <CodeBlock value={config.body} label={t('common.copy')} />
 
-            <Alert severity="warning">{copy.wizard.deviceMarkWarning}</Alert>
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 1,
-                px: 1.5,
-                py: 1,
-              }}
-            >
-              <Typography variant="labelLarge" color="text.secondary">
-                {copy.wizard.deviceMarkLabel}:
-              </Typography>
-              <Box
-                component="code"
-                sx={{ fontFamily: 'monospace', flex: 1, wordBreak: 'break-all' }}
-              >
-                {device.device_mark}
-              </Box>
-              <CopyButton value={device.device_mark} label={t('common.copy')} />
-            </Box>
 
             <Divider />
             <Typography variant="bodySmall" color="text.secondary">
@@ -371,7 +412,7 @@ export default function DeviceWizardDialog({
                       </TableCell>
                       <TableCell>
                         <Box component="code" sx={{ fontFamily: 'monospace' }}>
-                          {field.placeholder}
+                          {bodyTemplate[field.key]}
                         </Box>
                       </TableCell>
                       <TableCell>
@@ -392,7 +433,7 @@ export default function DeviceWizardDialog({
           </Stack>
         ) : null}
 
-        {activeStep === 3 ? (
+        {activeStep === 2 ? (
           <Stack spacing={2}>
             {secret ? (
               <>
@@ -400,7 +441,6 @@ export default function DeviceWizardDialog({
                 {/* 标签在上、代码值独占一整行：flex 挤排时 32 位 token 会被逐字折断成纵向栏 */}
                 {[
                   { label: copy.wizard.secretLabel, value: secret },
-                  { label: copy.wizard.deviceMarkLabel, value: device.device_mark },
                 ].map((row) => (
                   <Box
                     key={row.label}

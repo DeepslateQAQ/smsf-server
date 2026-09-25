@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """向 smsf-server 推送一条模拟短信（SMSForwarder 兼容）。
 
-用途：在没有手机的情况下验证「服务地址 + 请求头 + 请求体模板 + secret」这条链路，
+用途：在没有手机的情况下验证「Webhook Server + Headers + Params + Secret」这条链路，
       尤其是 HMAC 签名是否正确、同一请求重放是否被判为 duplicate。
 
 签名算法与 backend/app/security.py::compute_signature 完全一致：

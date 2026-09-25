@@ -191,6 +191,55 @@ def test_default_form_template_is_idempotent(db: DbSession, client: TestClient) 
     assert db.get(Device, device.id).last_auth_kind == "sign"
 
 
+
+def test_active_test_session_echoes_without_persisting(db: DbSession, client: TestClient) -> None:
+    """接入测试期间回显推送，但消息与设备活动时间都不得写入数据库。"""
+    owner = _make_user(db, "test-session-owner")
+    device = _make_device(db, owner, secret="test-session-secret")
+    login = client.post(
+        "/api/auth/login",
+        json={"username": owner.username, "password": "correct horse battery"},
+    )
+    assert login.status_code == 200, login.text
+
+    started = client.post(f"/api/devices/{device.id}/test-session")
+    assert started.status_code == 200, started.text
+    session_id = started.json()["session_id"]
+
+    timestamp = SIGN_TIMESTAMP + 1
+    payload = {
+        "device_mark": device.device_mark,
+        "from": "10086",
+        "content": "验证码 246810",
+        "timestamp": str(timestamp),
+        "sign": _sign(device.secret, timestamp),
+        "receive_time": "2026-09-12T10:30:00+08:00",
+    }
+    pushed = client.post(INGEST_PATH, data=payload)
+    assert pushed.status_code == 200, pushed.text
+    assert pushed.json()["id"] == 0
+    assert pushed.json()["code"] == "246810"
+    assert _message_count(db) == 0
+
+    db.expire_all()
+    stored_device = db.get(Device, device.id)
+    assert stored_device is not None
+    assert stored_device.last_ingest_at is None
+    assert stored_device.last_auth_kind == ""
+
+    status_response = client.get(f"/api/devices/{device.id}/test-session/{session_id}")
+    assert status_response.status_code == 200, status_response.text
+    assert status_response.json()["active"] is True
+    assert status_response.json()["push"]["sender"] == "10086"
+
+    closed = client.delete(f"/api/devices/{device.id}/test-session/{session_id}")
+    assert closed.status_code == 200, closed.text
+
+    normal = client.post(INGEST_PATH, data=payload)
+    assert normal.status_code == 200, normal.text
+    assert normal.json()["id"] > 0
+    assert _message_count(db) == 1
+
 def test_wrong_signature_returns_401(db: DbSession, client: TestClient) -> None:
     owner = _make_user(db)
     device = _make_device(db, owner, secret="right-secret")

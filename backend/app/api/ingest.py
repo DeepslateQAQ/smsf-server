@@ -36,7 +36,7 @@ from .. import deps, security
 from ..db import get_db
 from ..models import Device, Message
 from ..schemas import IngestResponse
-from ..services import audit
+from ..services import audit, test_sessions
 from ..services import ingest as ingest_service
 from ..services import settings as settings_service
 from ..services.events import hub
@@ -336,6 +336,27 @@ async def ingest_message(request: Request, db: DbSession = Depends(get_db)) -> I
     # 5. 停用设备用 403 而不是 401：凭据有效，重试没有意义。
     if not device.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="设备已停用")
+    # 接入向导测试会话只回显首条推送，不更新设备活动时间、不写消息表或成功审计。
+    try:
+        test_push = test_sessions.store.capture(
+            device.id,
+            device.secret,
+            payload,
+            sign_ok=sign_ok,
+            auth_kind=auth_kind,
+            limits=limits,
+        )
+    except ingest_service.IngestError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    if test_push is not None:
+        return IngestResponse(
+            ok=True,
+            id=0,
+            duplicate=False,
+            code=test_push.code,
+            received_at=test_push.received_at,
+            time_source=test_push.time_source,
+        )
 
     # 6. 落库（幂等键在 services.ingest 内计算，重放返回同一条）。
     try:

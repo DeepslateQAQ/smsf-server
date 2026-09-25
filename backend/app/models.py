@@ -99,7 +99,7 @@ class Device(Base):
     # secret 明文存储：HMAC 校验需要密钥本身（见方案 §8 的取舍说明）
     secret: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     secret_fingerprint: Mapped[str] = mapped_column(String(16))
-    # 公开的设备标识（key id）：填进 SmsForwarder 的「设备备注」，用于定位设备后再验签。
+    # 公开的设备标识（key id）：网页接入向导会直接写入 Webhook Params，用于定位设备后再验签。
     # 它不是秘密，泄露无碍；秘密始终是 secret。
     device_mark: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     last_auth_kind: Mapped[str] = mapped_column(String(16), default="")

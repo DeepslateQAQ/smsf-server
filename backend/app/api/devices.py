@@ -41,14 +41,17 @@ from ..schemas import (
     DeviceUpdate,
     ShareCreate,
     ShareOut,
+    TestPushOut,
+    TestSessionOut,
+    TestSessionStatus,
 )
-from ..services import audit
+from ..services import audit, test_sessions
 from ..services import settings as settings_service
 from . import _common
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
-# 公开的设备标识（填进 SmsForwarder 的「设备备注」），不是秘密。
+# 公开的设备标识由网页接入向导直接写入 Webhook Params，不是秘密。
 _DEVICE_MARK_PREFIX = "smsf-"
 
 
@@ -208,6 +211,56 @@ def create_device(
         detail={"name": device.name},
     )
     return _common.device_out(db, device, user, include_secret=True)
+
+@router.post("/{device_id}/test-session", response_model=TestSessionOut)
+def start_test_session(
+    device_id: int,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(current_user),
+) -> TestSessionOut:
+    """开启一次接入测试；测试会话内的首条推送只回显，不落消息表。"""
+    device = get_owned_device(db, user, device_id)
+    session = test_sessions.store.start(device.id, device.secret)
+    return TestSessionOut(session_id=session.session_id, expires_at=session.expires_at)
+
+
+@router.get("/{device_id}/test-session/{session_id}", response_model=TestSessionStatus)
+def get_test_session(
+    device_id: int,
+    session_id: str,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(current_user),
+) -> TestSessionStatus:
+    """轮询接入测试结果；无结果时保持 active=true。"""
+    device = get_owned_device(db, user, device_id)
+    active, push = test_sessions.store.status(device.id, device.secret, session_id)
+    push_out = (
+        TestPushOut(
+            sender=push.sender,
+            code=push.code,
+            received_at=push.received_at,
+            time_source=push.time_source,
+            sign_ok=push.sign_ok,
+            auth_kind=push.auth_kind,
+        )
+        if push is not None
+        else None
+    )
+    return TestSessionStatus(active=active, push=push_out)
+
+
+@router.delete("/{device_id}/test-session/{session_id}", response_model=DeleteResponse)
+def close_test_session(
+    device_id: int,
+    session_id: str,
+    db: DbSession = Depends(get_db),
+    user: User = Depends(current_user),
+) -> DeleteResponse:
+    """关闭接入测试；关闭后后续推送恢复正常入库。"""
+    device = get_owned_device(db, user, device_id)
+    test_sessions.store.close(device.id, device.secret, session_id)
+    return DeleteResponse()
+
 
 
 @router.get("/{device_id}", response_model=DeviceOut)

@@ -10,9 +10,8 @@
  *   POST   /devices/{id}/secret
  *   POST   /devices/{id}/shares
  *   DELETE /devices/{id}/shares/{userId}
- *   GET    /messages?device_ids=..&limit=1   （自检回显）
+ *   POST/GET/DELETE /devices/{id}/test-session   （隔离接入测试）
  */
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/api/client';
