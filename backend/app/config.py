@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 代码所在目录。只用于定位包内资源（静态文件、alembic 脚本），
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8801
     auto_migrate: bool = True
+    log_level: str = "INFO"
     root_path: str = ""
     trusted_proxy: bool = False
     static_dir: Path = APP_DIR / "static"
@@ -64,6 +65,14 @@ class Settings(BaseSettings):
 
     # 前端
     dev_cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def _normalize_log_level(cls, value: object) -> str:
+        level = str(value).upper()
+        if level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            raise ValueError("log_level must be DEBUG, INFO, WARNING, ERROR or CRITICAL")
+        return level
+
 
     @model_validator(mode="after")
     def _fill_database_url(self) -> Settings:

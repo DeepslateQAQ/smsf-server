@@ -60,6 +60,8 @@
             pydantic-settings
             argon2-cffi
             python-multipart
+            pillow
+            loguru
           ]);
 
           # 后端源码：过滤虚拟环境、缓存与运行期数据，避免污染 Nix store

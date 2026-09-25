@@ -16,8 +16,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
+from .logging_config import configure_logging
 from .migrations import run_migrations
 
+configure_logging(get_settings().log_level)
 logger = logging.getLogger(__name__)
 
 

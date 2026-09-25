@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-from logging.config import fileConfig
-
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from app.config import get_settings
 from app.db import Base
 from app import models  # noqa: F401  导入以注册全部表
+from app.logging_config import configure_logging
 
 config = context.config
-
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+settings = get_settings()
+configure_logging(settings.log_level)
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 target_metadata = Base.metadata
 
